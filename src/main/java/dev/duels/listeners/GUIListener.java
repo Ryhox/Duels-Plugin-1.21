@@ -245,25 +245,72 @@ public class GUIListener implements Listener {
         ItemMeta meta = clicked.getItemMeta();
         String name = meta.getDisplayName() == null ? "" : meta.getDisplayName();
 
-        if (name.equals("§cClose")) {
+        // Close / Back
+        if (name.equals("§cClose") || name.equals("§cBack")) {
             player.closeInventory();
             plugin.getGuiManager().closeGUI(player.getUniqueId());
             return;
         }
 
-        if (name.equals("§cBack")) {
+        PersistentDataContainer pdc = meta.getPersistentDataContainer();
+
+        Integer bestOf = pdc.get(bestOfValueKey, PersistentDataType.INTEGER);
+        String kitId = pdc.get(duelKitKey, PersistentDataType.STRING);
+        String targetStr = pdc.get(duelTargetKey, PersistentDataType.STRING);
+
+        if (bestOf == null || kitId == null || kitId.isEmpty() || targetStr == null || targetStr.isEmpty()) {
+            player.sendMessage(plugin.getPrefix() + "§cMissing duel data (bestof/kit/target).");
             player.closeInventory();
             plugin.getGuiManager().closeGUI(player.getUniqueId());
             return;
         }
 
-        Integer bestOf = meta.getPersistentDataContainer().get(bestOfValueKey, PersistentDataType.INTEGER);
-        if (bestOf == null) return;
+        UUID targetUuid;
+        try {
+            targetUuid = UUID.fromString(targetStr);
+        } catch (IllegalArgumentException ex) {
+            player.sendMessage(plugin.getPrefix() + "§cInvalid target data.");
+            player.closeInventory();
+            plugin.getGuiManager().closeGUI(player.getUniqueId());
+            return;
+        }
+
+        Player target = Bukkit.getPlayer(targetUuid);
+        if (target == null || !target.isOnline()) {
+            player.sendMessage(plugin.getPrefix() + "§cTarget player is offline.");
+            player.closeInventory();
+            plugin.getGuiManager().closeGUI(player.getUniqueId());
+            return;
+        }
+
+        // Arena auswählen
+        String arenaName = plugin.getArenaManager().reserveRandomFreeArenaName();
+        if (arenaName == null) {
+            player.sendMessage(plugin.getPrefix() + "§cNo free arena available!");
+            player.closeInventory();
+            plugin.getGuiManager().closeGUI(player.getUniqueId());
+            return;
+        }
+
+        DuelRequest request = new DuelRequest(
+                player.getUniqueId(),
+                target.getUniqueId(),
+                kitId,
+                arenaName,
+                bestOf
+        );
+
+        plugin.getDuelManager().addDuelRequest(target.getUniqueId(), request);
 
         player.closeInventory();
-        player.sendMessage(plugin.getPrefix() + "§7Selected Best of " + bestOf);
         plugin.getGuiManager().closeGUI(player.getUniqueId());
+
+        // Optional: feedback
+        player.sendMessage(plugin.getPrefix() + "§7Sent duel request to §c" + target.getName()
+                + " §7| Kit: §e" + kitId + " §7| Best of §f" + bestOf);
+        player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 1f);
     }
+
 
     private void handleEditLayoutGUIClick(InventoryClickEvent event, Player player, Inventory top, Inventory clickedInv) {
         final int raw = event.getRawSlot();

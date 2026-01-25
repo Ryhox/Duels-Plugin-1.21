@@ -23,16 +23,16 @@ public class SetStatsCommand implements CommandExecutor {
             return true;
         }
 
-        if (args.length != 3) {
+        if (args.length != 2) {
             sender.sendMessage(plugin.getPrefix() + "§7Usage: /" + label + " <player> <amount>");
             return true;
         }
 
-        String playerName = args[1];
+        String playerName = args[0];
         int amount;
 
         try {
-            amount = Integer.parseInt(args[2]);
+            amount = Integer.parseInt(args[1]);
         } catch (NumberFormatException e) {
             sender.sendMessage(plugin.getPrefix() + "§cInvalid amount!");
             return true;

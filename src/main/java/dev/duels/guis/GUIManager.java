@@ -314,7 +314,10 @@ public class GUIManager {
 
             ItemMeta meta = item.getItemMeta();
             meta.getPersistentDataContainer().set(bestOfValueKey, PersistentDataType.INTEGER, bestOf);
+            meta.getPersistentDataContainer().set(duelKitKey, PersistentDataType.STRING, kitId);
+            meta.getPersistentDataContainer().set(duelTargetKey, PersistentDataType.STRING, target.getUniqueId().toString());
             item.setItemMeta(meta);
+
 
             inv.setItem(slot, item);
             slot++;
