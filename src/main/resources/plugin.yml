@@ -1,0 +1,106 @@
+name: Duels
+version: 1.0
+main: dev.duels.DuelsPlugin
+api-version: 1.21
+description: A complete duels plugin with queues, kits and arenas
+author: Ryhox
+
+commands:
+  duels:
+    description: Main command
+    usage: /<command>
+    aliases: [duelplugin]
+
+  duel:
+    description: Challenge a player to a duel
+    usage: /<command> <player>
+
+  queue:
+    description: Queue commands
+    usage: /<command> <join|leave|gui> [kit]
+    aliases: [q]
+
+  kits:
+    description: View available kits
+    usage: /<command>
+
+  previewkit:
+    description: Preview a kit in your inventory
+    usage: /<command> <kitname>
+
+  stats:
+    description: Check your or another player's stats
+    usage: /<command> [player]
+
+  settings:
+    description: Open settings menu
+    usage: /<command>
+
+  arena:
+    description: Create and manage arenas
+    usage: /<command> <subcommand> [arenaName]
+
+  setspawn:
+    description: Set spawn location
+    usage: /<command>
+
+  setkills:
+    description: Set player kills
+    usage: /<command> <player> <amount>
+
+  setdeaths:
+    description: Set player deaths
+    usage: /<command> <player> <amount>
+
+  setwins:
+    description: Set player wins
+    usage: /<command> <player> <amount>
+
+  setlosses:
+    description: Set player losses
+    usage: /<command> <player> <amount>
+
+  kit:
+    description: Manage duel kits
+    usage: /kit <add|remove> ...
+
+  ping:
+    description: Check ping
+    usage: /<command> [player]
+
+  fly:
+    description: Toggle flight in lobby
+    usage: /<command>
+
+  spawn:
+    description: Teleport to spawn
+    usage: /<command>
+
+  accept:
+    description: Accept a duel request
+    usage: /<command>
+
+permissions:
+  duels.*:
+    description: Gives access to all duels commands
+    children:
+      duels.admin: true
+      duels.fly: true
+      duels.reload: true
+      duels.setspawn: true
+
+  duels.admin:
+    description: Admin permissions
+    default: op
+
+  duels.fly:
+    description: Allow flying in lobby
+    default: op
+
+  duels.reload:
+    description: Reload plugin config
+    default: op
+
+  duels.setspawn:
+    description: Set spawn location
+    default: op

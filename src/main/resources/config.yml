@@ -1,0 +1,42 @@
+# Duels Plugin Config by Ryhox
+
+# Scoreboard title
+scoreboard-title: "§3§l🪓 Duels"
+
+# Standard scoreboard lines (supports placeholders: %online%, %playing%, %kills%, %deaths%, %kd%, %wins%, %losses%, %winrate%)
+scoreboard-lines:
+  - ""
+  - "§a☻ §7ᴏɴʟɪɴᴇ §a%online%"
+  - "§6🏹 §7ɪɴ ᴅᴜᴇʟѕ §6%playing%"
+  - ""
+  - "§2🗡 §7ᴋɪʟʟѕ §2%kills%"
+  - "§c☠ §7ᴅᴇᴀᴛʜѕ §c%deaths%"
+  - "§e❤ §7ᴋᴅ §e%kd%"
+  - ""
+  - "§a✔ §7ᴡɪɴѕ §a%wins%"
+  - "§4✘ §7ʟᴏѕѕᴇѕ §4%losses%"
+  - "§b🧪 §7ᴡɪɴ ʀᴀᴛᴇ §b%winrate%"
+  - ""
+
+# Duel scoreboard lines (supports placeholders: %opponent%, %timeleft%, %map%, %playerping%, %opponentping%)
+duel-scoreboard-lines:
+  - ""
+  - "§a☻ §7ᴏɴʟɪɴᴇ §a%online%"
+  - "§6🏹 §7ɪɴ ᴅᴜᴇʟѕ §6%playing%"
+  - ""
+  - "§4🔥 §7ᴏᴘᴘᴏɴᴇɴᴛ §4%opponent%"
+  - "§b🗺 §7ᴍᴀᴘ §b%map%"
+  - ""
+  - "§a🛜§7ʏᴏᴜʀ ᴘɪɴɢ §a%playerping%"
+  - "§c🛜§7ᴏᴘᴘᴏɴᴇɴᴛѕ ᴘɪɴɢ §c%opponentping%"
+  - ""
+  - "§e🧪 §7ᴛɪᴍᴇ ʟᴇꜰᴛ §e%timeleft%"
+  - ""
+
+# Duel settings
+duel-time: 180  # Duel duration in seconds
+request-timeout: 30  # Request timeout in seconds
+default-map: "§cᴅᴜᴇʟѕ ᴍᴀᴘ"  # Default map name
+
+# Spawn location
+spawn: null
