@@ -4,7 +4,6 @@ import dev.duels.DuelsPlugin;
 import dev.duels.guis.GUIManager;
 import dev.duels.managers.DuelManager;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
@@ -21,9 +20,10 @@ import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.event.inventory.InventoryAction;
 import dev.duels.objects.DuelRequest;
+import io.papermc.paper.event.player.AsyncChatEvent;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import java.util.UUID;
 import java.util.Set;
-
 import java.util.List;
 
 public class GUIListener implements Listener {
@@ -50,7 +50,7 @@ public class GUIListener implements Listener {
         this.duelTargetKey = new NamespacedKey(plugin, "duel_target");
     }
     @EventHandler
-    public void onChat(org.bukkit.event.player.AsyncPlayerChatEvent event) {
+    public void onChat(AsyncChatEvent event) {
         Player player = event.getPlayer();
         UUID uuid = player.getUniqueId();
 
@@ -58,7 +58,7 @@ public class GUIListener implements Listener {
 
         event.setCancelled(true);
 
-        String msg = event.getMessage().trim();
+        String msg = PlainTextComponentSerializer.plainText().serialize(event.message()).trim();
         if (msg.equalsIgnoreCase("cancel")) {
             awaitingStatsSearch.remove(uuid);
             player.sendMessage(plugin.getPrefix() + "§7Search cancelled.");
@@ -283,20 +283,11 @@ public class GUIListener implements Listener {
             return;
         }
 
-        // Arena auswählen
-        String arenaName = plugin.getArenaManager().reserveRandomFreeArenaName();
-        if (arenaName == null) {
-            player.sendMessage(plugin.getPrefix() + "§cNo free arena available!");
-            player.closeInventory();
-            plugin.getGuiManager().closeGUI(player.getUniqueId());
-            return;
-        }
-
         DuelRequest request = new DuelRequest(
                 player.getUniqueId(),
                 target.getUniqueId(),
                 kitId,
-                arenaName,
+                null,
                 bestOf
         );
 
@@ -467,13 +458,21 @@ public class GUIListener implements Listener {
         String kitId = meta.getPersistentDataContainer().get(duelKitKey, PersistentDataType.STRING);
         if (kitId == null || kitId.isEmpty()) return;
 
-        String targetName = extractTargetFromLore(meta.getLore());
-        if (targetName == null) {
+        String targetStr = meta.getPersistentDataContainer().get(duelTargetKey, PersistentDataType.STRING);
+        if (targetStr == null || targetStr.isEmpty()) {
             player.sendMessage(plugin.getPrefix() + "§cCould not find target player!");
             return;
         }
 
-        Player target = Bukkit.getPlayerExact(targetName);
+        UUID targetUuid;
+        try {
+            targetUuid = UUID.fromString(targetStr);
+        } catch (IllegalArgumentException ex) {
+            player.sendMessage(plugin.getPrefix() + "§cInvalid target data.");
+            return;
+        }
+
+        Player target = Bukkit.getPlayer(targetUuid);
         if (target == null || !target.isOnline()) {
             player.sendMessage(plugin.getPrefix() + "§cTarget player not found or offline!");
             return;
@@ -486,20 +485,11 @@ public class GUIListener implements Listener {
 
         int defaultBestOf = plugin.getConfigManager().getMainConfig().getInt("default-bestof", 1);
 
-// Arena auswählen
-        String arenaName = plugin.getArenaManager().reserveRandomFreeArenaName();
-        if (arenaName == null) {
-            player.sendMessage(plugin.getPrefix() + "§cNo free arena available!");
-            player.closeInventory();
-            plugin.getGuiManager().closeGUI(player.getUniqueId());
-            return;
-        }
-
         DuelRequest request = new DuelRequest(
                 player.getUniqueId(),
                 target.getUniqueId(),
                 kitId,
-                arenaName,
+                null,
                 defaultBestOf
         );
 
@@ -507,15 +497,6 @@ public class GUIListener implements Listener {
 
         player.closeInventory();
         plugin.getGuiManager().closeGUI(player.getUniqueId());
-
-
-        /*
-        player.closeInventory();
-        player.sendMessage(plugin.getPrefix() + "§7Sending duel request to §c" + target.getName() +
-                "§7 with kit §e" + kitId + "§7 (Best of " + defaultBestOf + ")");
-        plugin.getGuiManager().closeGUI(player.getUniqueId());
-        */
-
     }
 
     private void handleKitsGUIClick(InventoryClickEvent event, Player player, Inventory top, Inventory clickedInv) {
@@ -628,22 +609,5 @@ public class GUIListener implements Listener {
         return (kitId == null || kitId.isEmpty()) ? null : kitId;
     }
 
-    private String extractTargetFromLore(List<String> lore) {
-        if (lore == null || lore.isEmpty()) return null;
-
-        for (String line : lore) {
-            if (!line.contains("Challenge §c")) continue;
-
-            String[] parts = line.split("§c", 2);
-            if (parts.length < 2) continue;
-
-            String targetPart = ChatColor.stripColor(parts[1]).trim();
-            if (targetPart.isEmpty()) continue;
-
-            String[] words = targetPart.split(" ");
-            if (words.length > 0) return words[0];
-        }
-        return null;
-    }
 }
 

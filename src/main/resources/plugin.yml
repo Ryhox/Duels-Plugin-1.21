@@ -80,6 +80,10 @@ commands:
     description: Accept a duel request
     usage: /<command>
 
+  forfeit:
+    description: Forfeit your current duel
+    usage: /<command>
+
 permissions:
   duels.*:
     description: Gives access to all duels commands

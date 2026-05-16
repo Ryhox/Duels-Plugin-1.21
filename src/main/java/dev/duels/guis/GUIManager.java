@@ -275,6 +275,7 @@ public class GUIManager {
                 ));
 
                 meta.getPersistentDataContainer().set(duelKitKey, PersistentDataType.STRING, kitId);
+                meta.getPersistentDataContainer().set(duelTargetKey, PersistentDataType.STRING, target.getUniqueId().toString());
                 kitItem.setItemMeta(meta);
 
                 int row = startRow + r;

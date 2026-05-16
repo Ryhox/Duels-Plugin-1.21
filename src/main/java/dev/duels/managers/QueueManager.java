@@ -33,6 +33,8 @@ public class QueueManager {
         if (!queue.contains(uuid)) {
             queue.addLast(uuid);
             lastQueueKit.put(uuid, kitName);
+            plugin.getConfigManager().getPlayersConfig().set(uuid + ".lastQueueKit", kitName);
+            plugin.getConfigManager().savePlayersConfig();
             String kitDisplay = plugin.getKitManager().getKitDisplayName(kitName);
             player.sendMessage(plugin.getPrefix() + "§aQueued §7for kit §r" + kitDisplay + "§7.");
             player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1f);
@@ -92,8 +94,19 @@ public class QueueManager {
     }
 
     private void startQueueMatch(Player player1, Player player2, String kitName) {
-        // Arena holen
-        dev.duels.objects.Arena arena = plugin.getArenaManager().getRandomAvailableArena();
+        // Check for kit-bound arena first, fall back to random
+        dev.duels.objects.Arena arena = null;
+        String boundArenaName = plugin.getArenaManager().getKitArenaBinding(kitName);
+        if (boundArenaName != null) {
+            dev.duels.objects.Arena bound = plugin.getArenaManager().getArena(boundArenaName);
+            if (bound != null && !bound.isInUse() && bound.hasSnapshot()
+                    && bound.getSpawn1() != null && bound.getSpawn2() != null) {
+                arena = bound;
+            }
+        }
+        if (arena == null) {
+            arena = plugin.getArenaManager().getRandomAvailableArena();
+        }
         if (arena == null) {
             player1.sendMessage(plugin.getPrefix() + "§cNo available arenas!");
             player2.sendMessage(plugin.getPrefix() + "§cNo available arenas!");
@@ -148,11 +161,18 @@ public class QueueManager {
     }
 
     public String getLastQueueKit(UUID uuid) {
-        return lastQueueKit.get(uuid);
+        String cached = lastQueueKit.get(uuid);
+        if (cached != null) return cached;
+        // Fall back to persisted value from players.yml
+        String saved = plugin.getConfigManager().getPlayersConfig().getString(uuid + ".lastQueueKit", null);
+        if (saved != null) lastQueueKit.put(uuid, saved);
+        return saved;
     }
 
     public void setLastQueueKit(UUID uuid, String kitName) {
         lastQueueKit.put(uuid, kitName);
+        plugin.getConfigManager().getPlayersConfig().set(uuid + ".lastQueueKit", kitName);
+        plugin.getConfigManager().savePlayersConfig();
     }
 
     public void cleanup() {

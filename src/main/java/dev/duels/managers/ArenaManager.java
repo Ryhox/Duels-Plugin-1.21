@@ -14,6 +14,7 @@ public class ArenaManager {
     private final DuelsPlugin plugin;
     private final Map<String, Arena> arenas = new HashMap<>();
     private final Map<String, Arena> availableArenas = new HashMap<>();
+    private final Map<String, String> kitArenaBindings = new HashMap<>();
     private Location spawnLocation;
 
     public ArenaManager(DuelsPlugin plugin) {
@@ -23,14 +24,38 @@ public class ArenaManager {
     public void loadArenas() {
         arenas.clear();
         availableArenas.clear();
+        kitArenaBindings.clear();
 
-        // Lobby spawn from main config (can stay as Bukkit Location)
-        if (plugin.getConfigManager().getMainConfig().contains("spawn")) {
-            spawnLocation = plugin.getConfigManager().getMainConfig().getLocation("spawn");
+        // Load spawn - prefer string format for cross-version reliability
+        var mainCfg = plugin.getConfigManager().getMainConfig();
+        if (mainCfg.isString("spawn")) {
+            String spawnStr = mainCfg.getString("spawn");
+            if (spawnStr != null && !spawnStr.equalsIgnoreCase("null") && !spawnStr.isEmpty()) {
+                spawnLocation = stringToLoc(spawnStr);
+            }
+        } else if (mainCfg.contains("spawn") && mainCfg.get("spawn") != null) {
+            // Backwards compat: Bukkit serialized Location
+            spawnLocation = mainCfg.getLocation("spawn");
         }
 
         var arenaCfg = plugin.getConfigManager().getArenaConfig();
-        if (arenaCfg == null || !arenaCfg.contains("arenas")) return;
+        if (arenaCfg == null) return;
+
+        // Load kit-arena bindings
+        if (arenaCfg.contains("kit-bindings")) {
+            var bindSection = arenaCfg.getConfigurationSection("kit-bindings");
+            if (bindSection != null) {
+                for (String kitId : bindSection.getKeys(false)) {
+                    String arenaName = arenaCfg.getString("kit-bindings." + kitId);
+                    if (arenaName != null && !arenaName.isEmpty()) {
+                        kitArenaBindings.put(kitId, arenaName);
+                        plugin.getLogger().info("Kit binding: " + kitId + " -> " + arenaName);
+                    }
+                }
+            }
+        }
+
+        if (!arenaCfg.contains("arenas")) return;
 
         var arenasSec = arenaCfg.getConfigurationSection("arenas");
         if (arenasSec == null) return;
@@ -39,39 +64,30 @@ public class ArenaManager {
             Arena arena = new Arena(arenaName);
             String path = "arenas." + arenaName;
 
-            // --- Load positions (supports BOTH formats) ---
-            // Format A (old): Bukkit serialized Location section
-            // Format B (new/pretty): "world,x,y,z,yaw,pitch" string
-
-            // spawn1
             if (arenaCfg.isString(path + ".spawn1")) {
                 arena.setSpawn1(stringToLoc(arenaCfg.getString(path + ".spawn1")));
             } else if (arenaCfg.contains(path + ".spawn1")) {
                 arena.setSpawn1(arenaCfg.getLocation(path + ".spawn1"));
             }
 
-            // spawn2
             if (arenaCfg.isString(path + ".spawn2")) {
                 arena.setSpawn2(stringToLoc(arenaCfg.getString(path + ".spawn2")));
             } else if (arenaCfg.contains(path + ".spawn2")) {
                 arena.setSpawn2(arenaCfg.getLocation(path + ".spawn2"));
             }
 
-            // corner1
             if (arenaCfg.isString(path + ".corner1")) {
                 arena.setCorner1(stringToLoc(arenaCfg.getString(path + ".corner1")));
             } else if (arenaCfg.contains(path + ".corner1")) {
                 arena.setCorner1(arenaCfg.getLocation(path + ".corner1"));
             }
 
-            // corner2
             if (arenaCfg.isString(path + ".corner2")) {
                 arena.setCorner2(stringToLoc(arenaCfg.getString(path + ".corner2")));
             } else if (arenaCfg.contains(path + ".corner2")) {
                 arena.setCorner2(arenaCfg.getLocation(path + ".corner2"));
             }
 
-            // Snapshot load (your existing method)
             loadArenaSnapshot(arena);
 
             arenas.put(arenaName, arena);
@@ -121,14 +137,15 @@ public class ArenaManager {
             } catch (Exception ignored) {}
         }
     }
-    private String locToString(Location loc) {
+
+    public String locToString(Location loc) {
         if (loc == null || loc.getWorld() == null) return null;
         return loc.getWorld().getName() + ","
                 + loc.getX() + "," + loc.getY() + "," + loc.getZ() + ","
                 + loc.getYaw() + "," + loc.getPitch();
     }
 
-    private Location stringToLoc(String s) {
+    public Location stringToLoc(String s) {
         if (s == null || s.isEmpty()) return null;
         String[] p = s.split(",", 6);
         if (p.length < 4) return null;
@@ -157,7 +174,6 @@ public class ArenaManager {
         saveArenaSnapshot(arena);
         plugin.getConfigManager().saveArenaConfig();
     }
-
 
     private void saveArenaSnapshot(Arena arena) {
         String path = "arenas." + arena.getName() + ".snapshot";
@@ -201,7 +217,6 @@ public class ArenaManager {
                     arena.getCorner1() != null && arena.getCorner2() != null) {
                 available.add(arena);
             }
-
         }
 
         if (available.isEmpty()) return null;
@@ -209,7 +224,7 @@ public class ArenaManager {
     }
 
     public String reserveRandomFreeArenaName() {
-        Arena arena = getRandomAvailableArena(); // nutzt deine vorhandene Filter-Logik
+        Arena arena = getRandomAvailableArena();
         return (arena == null) ? null : arena.getName();
     }
 
@@ -225,7 +240,6 @@ public class ArenaManager {
             return;
         }
 
-        // Blocks setzen (sync, weil Block-API main thread)
         Bukkit.getScheduler().runTask(plugin, () -> {
             for (Map.Entry<BlockVector, org.bukkit.block.data.BlockData> e : arena.getOriginalBlocks().entrySet()) {
                 BlockVector v = e.getKey();
@@ -259,7 +273,6 @@ public class ArenaManager {
         arena.setCorner1(corner1);
         arena.setCorner2(corner2);
 
-        // Snapshot erstellen
         captureArenaSnapshot(arena);
 
         arenas.put(name, arena);
@@ -315,18 +328,16 @@ public class ArenaManager {
 
     public void setSpawnLocation(Location location) {
         this.spawnLocation = location;
-        plugin.getConfigManager().getMainConfig().set("spawn", location);
-        plugin.getConfigManager().saveAllConfigs();
-
-
+        // Use string format for cross-version reliability
+        plugin.getConfigManager().getMainConfig().set("spawn", locToString(location));
+        plugin.saveConfig();
     }
-
 
     public Location getSpawnLocation() {
         return spawnLocation;
     }
 
-    // Füge diese Methoden zur ArenaManager Klasse hinzu:
+    // --- Arena position setters ---
 
     public boolean setArenaSpawn1(String arenaName, Location location) {
         Arena arena = arenas.get(arenaName);
@@ -382,25 +393,36 @@ public class ArenaManager {
 
     public boolean createArena(String name) {
         Arena arena = arenas.get(name);
-        if (arena == null) {
-            return false;
-        }
+        if (arena == null) return false;
 
-        if (arena.getSpawn1() == null || arena.getSpawn2() == null) {
-            return false;
-        }
+        if (arena.getSpawn1() == null || arena.getSpawn2() == null) return false;
+        if (arena.getCorner1() == null || arena.getCorner2() == null) return false;
 
-        if (arena.getCorner1() == null || arena.getCorner2() == null) {
-            return false;
-        }
-
-        // Snapshot erstellen
         captureArenaSnapshot(arena);
         saveArena(arena);
         return true;
     }
 
+    // --- Kit-Arena bindings ---
 
+    public void setKitArenaBinding(String kitId, String arenaName) {
+        if (arenaName == null || arenaName.isBlank()) {
+            kitArenaBindings.remove(kitId);
+            plugin.getConfigManager().getArenaConfig().set("kit-bindings." + kitId, null);
+        } else {
+            kitArenaBindings.put(kitId, arenaName);
+            plugin.getConfigManager().getArenaConfig().set("kit-bindings." + kitId, arenaName);
+        }
+        plugin.getConfigManager().saveArenaConfig();
+    }
+
+    public String getKitArenaBinding(String kitId) {
+        return kitArenaBindings.get(kitId);
+    }
+
+    public Map<String, String> getAllKitArenaBindings() {
+        return Collections.unmodifiableMap(kitArenaBindings);
+    }
 
     public void cleanup() {
         for (Arena arena : arenas.values()) {

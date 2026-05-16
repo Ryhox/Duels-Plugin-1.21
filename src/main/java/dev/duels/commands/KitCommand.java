@@ -7,13 +7,18 @@ import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.stream.Collectors;
 
-public class KitCommand implements CommandExecutor {
+public class KitCommand implements CommandExecutor, TabCompleter {
 
     private final DuelsPlugin plugin;
 
@@ -164,6 +169,23 @@ public class KitCommand implements CommandExecutor {
 
         player.sendMessage(plugin.getPrefix() + "§7Kit " + display + " §7has been §c§lremoved!");
         return true;
+    }
+
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (!sender.hasPermission("duels.admin")) return List.of();
+        if (args.length == 1) {
+            return Arrays.asList("add", "remove").stream()
+                    .filter(s -> s.startsWith(args[0].toLowerCase()))
+                    .collect(Collectors.toList());
+        }
+        if (args.length == 2 && (args[0].equalsIgnoreCase("remove") || args[0].equalsIgnoreCase("delete"))) {
+            String prefix = args[1].toLowerCase();
+            return new ArrayList<>(plugin.getKitManager().getKitNames()).stream()
+                    .filter(s -> s.toLowerCase().startsWith(prefix))
+                    .collect(Collectors.toList());
+        }
+        return List.of();
     }
 
     private void sendUsage(Player player) {

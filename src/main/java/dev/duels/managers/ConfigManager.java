@@ -26,8 +26,8 @@ public class ConfigManager {
     }
 
     public void loadAllConfigs() {
-        // Main config
-        plugin.saveDefaultConfig();
+        // Main config - reload from disk so /duels reload picks up file changes
+        plugin.reloadConfig();
         mainConfig = plugin.getConfig();
 
         // Players config
@@ -51,9 +51,10 @@ public class ConfigManager {
         }
         arenaConfig = YamlConfiguration.loadConfiguration(arenaFile);
 
-        // Default Werte setzen
+        // Fill in any missing defaults
         setDefaults();
     }
+
     public void reloadPlayersConfig() {
         if (playersFile == null) {
             playersFile = new File(plugin.getDataFolder(), "players.yml");
@@ -66,9 +67,8 @@ public class ConfigManager {
                 plugin.getLogger().severe("Could not create players.yml: " + e.getMessage());
             }
         }
-        playersConfig = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(playersFile);
+        playersConfig = YamlConfiguration.loadConfiguration(playersFile);
     }
-
 
     private void createDefaultFile(File file, String resourceName) {
         try {
@@ -88,8 +88,14 @@ public class ConfigManager {
     }
 
     private void setDefaults() {
+        // Check each key individually so new keys are added even on existing configs
+        boolean changed = false;
+
         if (!mainConfig.contains("scoreboard-title")) {
             mainConfig.set("scoreboard-title", "§3§l🪓 Duels");
+            changed = true;
+        }
+        if (!mainConfig.contains("scoreboard-lines")) {
             mainConfig.set("scoreboard-lines", java.util.Arrays.asList(
                     "",
                     "§a☻ §7ᴏɴʟɪɴᴇ §a%online%",
@@ -104,6 +110,9 @@ public class ConfigManager {
                     "§b🧪 §7ᴡɪɴ ʀᴀᴛᴇ §b%winrate%",
                     ""
             ));
+            changed = true;
+        }
+        if (!mainConfig.contains("duel-scoreboard-lines")) {
             mainConfig.set("duel-scoreboard-lines", java.util.Arrays.asList(
                     "",
                     "§a☻ §7ᴏɴʟɪɴᴇ §a%online%",
@@ -118,13 +127,30 @@ public class ConfigManager {
                     "§e🧪 §7ᴛɪᴍᴇ ʟᴇꜰᴛ §e%timeleft%",
                     ""
             ));
-            mainConfig.set("duel-time", 180);
-            mainConfig.set("request-timeout", 30);
-            mainConfig.set("default-map", "§cᴅᴜᴇʟѕ ᴍᴀᴘ");
-            mainConfig.set("default-bestof", 3);
-            mainConfig.set("bestof-options", java.util.Arrays.asList(1, 3, 5, 10));
-            plugin.saveConfig();
+            changed = true;
         }
+        if (!mainConfig.contains("duel-time")) {
+            mainConfig.set("duel-time", 180);
+            changed = true;
+        }
+        if (!mainConfig.contains("request-timeout")) {
+            mainConfig.set("request-timeout", 30);
+            changed = true;
+        }
+        if (!mainConfig.contains("default-map")) {
+            mainConfig.set("default-map", "§cᴅᴜᴇʟѕ ᴍᴀᴘ");
+            changed = true;
+        }
+        if (!mainConfig.contains("default-bestof")) {
+            mainConfig.set("default-bestof", 3);
+            changed = true;
+        }
+        if (!mainConfig.contains("bestof-options")) {
+            mainConfig.set("bestof-options", java.util.Arrays.asList(1, 3, 5, 10));
+            changed = true;
+        }
+
+        if (changed) plugin.saveConfig();
     }
 
     public void saveAllConfigs() {
@@ -135,13 +161,16 @@ public class ConfigManager {
     }
 
     public void savePlayersConfig() {
-        try {
-            playersConfig.save(playersFile);
-        } catch (Exception e) {
-            plugin.getLogger().severe("Could not save players.yml: " + e.getMessage());
-        }
+        FileConfiguration snapshot = playersConfig;
+        File file = playersFile;
+        org.bukkit.Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                snapshot.save(file);
+            } catch (Exception e) {
+                plugin.getLogger().severe("Could not save players.yml: " + e.getMessage());
+            }
+        });
     }
-
 
     public void saveKitsConfig() {
         try {

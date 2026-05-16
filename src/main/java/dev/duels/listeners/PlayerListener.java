@@ -35,7 +35,16 @@ public class PlayerListener implements Listener {
         forceLobbyState(player);
 
         Location spawn = plugin.getArenaManager().getSpawnLocation();
-        if (spawn != null) player.teleport(spawn);
+        if (spawn != null) {
+            player.teleport(spawn);
+        } else {
+            // arenaManager loads with a 40-tick delay on startup — retry after it finishes
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (!player.isOnline()) return;
+                Location s = plugin.getArenaManager().getSpawnLocation();
+                if (s != null) player.teleport(s);
+            }, 45L);
+        }
 
         plugin.getPlayerManager().setupPlayerInventory(player);
 
@@ -48,6 +57,27 @@ public class PlayerListener implements Listener {
         }, 2L);
 
         plugin.getScoreboardManager().updateScoreboard(player);
+
+        // Show setup instructions to OPs when no spawn is set
+        if (player.isOp() && plugin.getArenaManager().getSpawnLocation() == null) {
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (!player.isOnline()) return;
+                player.sendMessage("");
+                player.sendMessage(plugin.getPrefix() + "§e§lFirst-time Setup Guide:");
+                player.sendMessage(plugin.getPrefix() + "§7No spawn point is set! Follow these steps:");
+                player.sendMessage("  §e1. §7Stand where you want spawn and run: §a/setspawn");
+                player.sendMessage("  §e2. §7Create an arena step by step:");
+                player.sendMessage("     §a/arena setfirst <name>  §8— §7first player spawn");
+                player.sendMessage("     §a/arena setsecond <name> §8— §7second player spawn");
+                player.sendMessage("     §a/arena setcorner1 <name> §8— §7one corner of the arena region");
+                player.sendMessage("     §a/arena setcorner2 <name> §8— §7opposite corner of the arena region");
+                player.sendMessage("     §a/arena create <name>   §8— §7saves the arena & snapshot");
+                player.sendMessage("  §e3. §7Equip items, then create a kit: §a/kit add <name> <item>");
+                player.sendMessage("  §e4. §7(Optional) Bind a kit to an arena: §a/arena kit <kitname> <arenaname>");
+                player.sendMessage("  §e5. §7See all commands: §a/duels");
+                player.sendMessage("");
+            }, 40L);
+        }
     }
 
     @EventHandler
@@ -70,6 +100,7 @@ public class PlayerListener implements Listener {
         Player player = event.getPlayer();
         UUID uuid = player.getUniqueId();
 
+        // Priority 1: Next-round respawn (player died mid-duel, more rounds remain)
         Location pendingRespawn = plugin.getDuelManager().getPendingRespawn(uuid);
         if (pendingRespawn != null && plugin.getDuelManager().isInDuel(uuid)) {
             event.setRespawnLocation(pendingRespawn);
@@ -85,6 +116,25 @@ public class PlayerListener implements Listener {
             return;
         }
 
+        // Priority 2: Duel ended while player was dead — send to spawn + restore lobby
+        if (plugin.getDuelManager().isPendingLobbyRespawn(uuid)) {
+            plugin.getDuelManager().removePendingLobbyRespawn(uuid);
+
+            Location spawn = plugin.getArenaManager().getSpawnLocation();
+            if (spawn != null) event.setRespawnLocation(spawn);
+
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                forceLobbyState(player);
+                plugin.getPlayerManager().setupPlayerInventory(player);
+                plugin.getPlayerManager().refreshQueueSlotItem(player);
+                spawnParticlesCircle(player);
+                plugin.getPlayerManager().applyLobbyFly(player);
+                plugin.getScoreboardManager().updateScoreboard(player);
+            }, 1L);
+            return;
+        }
+
+        // Priority 3: Normal (non-duel) respawn
         Location spawn = plugin.getArenaManager().getSpawnLocation();
         if (spawn != null) event.setRespawnLocation(spawn);
 
@@ -134,12 +184,9 @@ public class PlayerListener implements Listener {
     public void onInteract(PlayerInteractEvent event) {
         Player player = event.getPlayer();
 
-        // ✅ Only react on RIGHT CLICK (prevents “hit air with sword” triggering this)
         switch (event.getAction()) {
             case RIGHT_CLICK_AIR, RIGHT_CLICK_BLOCK -> { }
-            default -> {
-                return;
-            }
+            default -> { return; }
         }
 
         if (event.getItem() == null || !event.getItem().hasItemMeta()) return;
@@ -147,7 +194,6 @@ public class PlayerListener implements Listener {
         String displayName = event.getItem().getItemMeta().getDisplayName();
         if (displayName == null) return;
 
-        // Queue Items
         if (displayName.contains("ʟᴇᴀᴠᴇ ǫᴜᴇᴜᴇ")) {
             event.setCancelled(true);
 
@@ -160,7 +206,6 @@ public class PlayerListener implements Listener {
 
             return;
         }
-
 
         if (displayName.contains("ᴊᴏɪɴ ʟᴀѕᴛ ǫᴜᴇᴜᴇ")) {
             event.setCancelled(true);
@@ -180,7 +225,6 @@ public class PlayerListener implements Listener {
             return;
         }
 
-        // Challenge Sword
         if (displayName.contains("ᴄʜᴀʟʟᴇɴɢᴇ")) {
             event.setCancelled(true);
             if (!plugin.getDuelManager().isInDuel(player.getUniqueId())) {
@@ -190,7 +234,6 @@ public class PlayerListener implements Listener {
             return;
         }
 
-        // Stats Book
         if (displayName.contains("ѕᴛᴀᴛѕ")) {
             event.setCancelled(true);
             plugin.getGuiManager().openStatsGUI(player);
@@ -198,7 +241,6 @@ public class PlayerListener implements Listener {
             return;
         }
 
-        // Settings
         if (displayName.contains("ѕᴇᴛᴛɪɴɢѕ")) {
             event.setCancelled(true);
             plugin.getGuiManager().openSettingsGUI(player);
@@ -206,7 +248,6 @@ public class PlayerListener implements Listener {
             return;
         }
 
-// Visibility Toggle
         if (displayName.contains("ᴘʟᴀʏᴇʀ ᴠɪѕɪʙɪʟɪᴛʏ")) {
             event.setCancelled(true);
 
@@ -217,8 +258,6 @@ public class PlayerListener implements Listener {
             player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 1.2f);
             return;
         }
-
-
     }
 
     private void forceLobbyState(Player player) {
@@ -251,7 +290,6 @@ public class PlayerListener implements Listener {
 
         player.setAbsorptionAmount(0.0);
     }
-
 
     private void spawnParticlesCircle(Player player) {
         Location loc = player.getLocation().clone().add(0, 1, 0);

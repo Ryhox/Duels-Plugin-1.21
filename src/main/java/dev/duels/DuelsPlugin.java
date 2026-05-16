@@ -94,24 +94,40 @@ public final class DuelsPlugin extends JavaPlugin {
     }
 
     private void registerCommands() {
-        getCommand("duels").setExecutor(new MainCommand(this));
-        getCommand("duel").setExecutor(new DuelCommand(this));
-        getCommand("queue").setExecutor(new QueueCommand(this));
+        MainCommand mainCmd = new MainCommand(this);
+        getCommand("duels").setExecutor(mainCmd);
+        getCommand("duels").setTabCompleter(mainCmd);
+
+        DuelCommand duelCmd = new DuelCommand(this);
+        getCommand("duel").setExecutor(duelCmd);
+        getCommand("duel").setTabCompleter(duelCmd);
+
+        QueueCommand queueCmd = new QueueCommand(this);
+        getCommand("queue").setExecutor(queueCmd);
+        getCommand("queue").setTabCompleter(queueCmd);
+
+        ArenaCommand arenaCmd = new ArenaCommand(this);
+        getCommand("arena").setExecutor(arenaCmd);
+        getCommand("arena").setTabCompleter(arenaCmd);
+
+        KitCommand kitCmd = new KitCommand(this);
+        getCommand("kit").setExecutor(kitCmd);
+        getCommand("kit").setTabCompleter(kitCmd);
+
         getCommand("kits").setExecutor(new KitsCommand(this));
         getCommand("previewkit").setExecutor(new PreviewKitCommand(this));
         getCommand("stats").setExecutor(new StatsCommand(this));
         getCommand("settings").setExecutor(new SettingsCommand(this));
-        getCommand("arena").setExecutor(new ArenaCommand(this));
         getCommand("setspawn").setExecutor(new SetSpawnCommand(this));
         getCommand("setkills").setExecutor(new SetStatsCommand(this));
         getCommand("setdeaths").setExecutor(new SetStatsCommand(this));
         getCommand("setwins").setExecutor(new SetStatsCommand(this));
         getCommand("setlosses").setExecutor(new SetStatsCommand(this));
-        getCommand("kit").setExecutor(new KitCommand(this));
         getCommand("ping").setExecutor(new PingCommand(this));
         getCommand("fly").setExecutor(new FlyCommand(this));
         getCommand("spawn").setExecutor(new SpawnCommand(this));
         getCommand("accept").setExecutor(new AcceptCommand(this));
+        getCommand("forfeit").setExecutor(new ForfeitCommand(this));
     }
 
     private void startTasks() {

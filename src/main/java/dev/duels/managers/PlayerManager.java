@@ -252,6 +252,7 @@ public List<PlayerData> getAllPlayerDataSnapshot() {
     }
 
     public void teleportToSpawn(Player player) {
+        if (player == null || !player.isOnline() || player.isDead()) return;
         Location spawn = plugin.getArenaManager().getSpawnLocation();
         if (spawn == null) {
             player.sendMessage(plugin.getPrefix() + "§cSpawn has not been set yet!");

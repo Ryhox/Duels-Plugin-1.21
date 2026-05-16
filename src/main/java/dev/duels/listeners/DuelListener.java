@@ -93,7 +93,10 @@ public class DuelListener implements Listener {
         // Diamond Sword Hit für Duel Request
         if (event.getDamager() instanceof Player) {
             Player damager = (Player) event.getDamager();
-            if (damager.getInventory().getItemInMainHand().getType() == Material.DIAMOND_SWORD) {
+            org.bukkit.inventory.ItemStack held = damager.getInventory().getItemInMainHand();
+            if (held.getType() == Material.DIAMOND_SWORD
+                    && held.hasItemMeta()
+                    && held.getItemMeta().getDisplayName().contains("ᴄʜᴀʟʟᴇɴɢᴇ")) {
                 event.setCancelled(true);
 
                 // Duel Request senden

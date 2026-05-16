@@ -4,9 +4,12 @@ import dev.duels.DuelsPlugin;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 
-public class MainCommand implements CommandExecutor {
+import java.util.List;
+
+public class MainCommand implements CommandExecutor, TabCompleter {
 
     private final DuelsPlugin plugin;
 
@@ -26,32 +29,49 @@ public class MainCommand implements CommandExecutor {
             return true;
         }
 
-        // Hilfe anzeigen
-        sender.sendMessage(plugin.getPrefix() + "§aDuels Plugin by Ryhox.");
-        sender.sendMessage("§3Commands:");
-        sender.sendMessage("§c/duels reload §8- §7Reload the plugin configuration");
-        sender.sendMessage("§c/spawn §8- §7Teleport to spawn");
-        sender.sendMessage("§c/stats [player] §8- §7Check stats");
-        sender.sendMessage("§c/duel <player> §8- §7Challenge a player to a duel");
-        sender.sendMessage("§c/kits §8- §7View available kits");
-        sender.sendMessage("§c/accept §8- §7Accept a pending duel request");
-        sender.sendMessage("§c/ping <player> §8- §7Check ping");
-        sender.sendMessage("§c/previewkit <kitname> §8- §7Preview a kit in your inventory");
-        sender.sendMessage("§c/queue join <kit> §8- §7Join a queue");
-        sender.sendMessage("§c/queue gui §8- §7Open the kit GUI");
-        sender.sendMessage("§c/queue leave §8- §7Leave a queue");
+        // Help message
+        sender.sendMessage(plugin.getPrefix() + "§aDuels Plugin by Ryhox §8| §7All Commands:");
+        sender.sendMessage("§a/duel <player> §8— §7Challenge a player (opens kit GUI)");
+        sender.sendMessage("§a/accept §8— §7Accept a pending duel request");
+        sender.sendMessage("§a/queue gui §8— §7Open queue kit selection");
+        sender.sendMessage("§a/queue join <kit> §8— §7Join a kit queue");
+        sender.sendMessage("§a/queue leave §8— §7Leave your current queue");
+        sender.sendMessage("§a/kits §8— §7Browse available kits");
+        sender.sendMessage("§a/previewkit <kitname> §8— §7Preview a kit in your inventory");
+        sender.sendMessage("§a/stats [player] §8— §7View stats or leaderboard");
+        sender.sendMessage("§a/spawn §8— §7Teleport to spawn");
+        sender.sendMessage("§a/forfeit §8— §7Forfeit your current duel");
+        sender.sendMessage("§a/ping [player] §8— §7Check ping");
+        sender.sendMessage("§a/settings §8— §7Open settings menu");
 
         if (sender.hasPermission("duels.admin")) {
-            sender.sendMessage("§c/setspawn §8- §7Set spawn location");
-            sender.sendMessage("§c/setkills <player> <amount> §8- §7Set player kills");
-            sender.sendMessage("§c/setdeaths <player> <amount> §8- §7Set player deaths");
-            sender.sendMessage("§c/setwins <player> <amount> §8- §7Set player wins");
-            sender.sendMessage("§c/setlosses <player> <amount> §8- §7Set player losses");
-            sender.sendMessage("§c/addkit <name> <preview_item> §8- §7Create a new kit");
-            sender.sendMessage("§c/arenacreate §8- §7Create and manage arenas");
+            sender.sendMessage("");
+            sender.sendMessage("§c§lAdmin Commands:");
+            sender.sendMessage("§c/setspawn §8— §7Set the spawn location");
+            sender.sendMessage("§c/kit add <name> <item> §8— §7Create a kit from your inventory");
+            sender.sendMessage("§c/kit remove <name> §8— §7Delete a kit");
+            sender.sendMessage("§c/arena setfirst <name> §8— §7Set arena spawn 1");
+            sender.sendMessage("§c/arena setsecond <name> §8— §7Set arena spawn 2");
+            sender.sendMessage("§c/arena setcorner1 <name> §8— §7Set arena corner 1");
+            sender.sendMessage("§c/arena setcorner2 <name> §8— §7Set arena corner 2");
+            sender.sendMessage("§c/arena create <name> §8— §7Finalise arena & save snapshot");
+            sender.sendMessage("§c/arena kit <kit> <arena> §8— §7Bind a kit to always use an arena");
+            sender.sendMessage("§c/arena list §8— §7List all arenas");
+            sender.sendMessage("§c/arena info <name> §8— §7Show arena details");
+            sender.sendMessage("§c/arena delete <name> §8— §7Delete an arena");
+            sender.sendMessage("§c/setkills/setdeaths/setwins/setlosses <player> <amount>");
+            sender.sendMessage("§c/duels reload §8— §7Reload plugin config");
         }
 
         return true;
+    }
+
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (args.length == 1 && sender.hasPermission("duels.reload")) {
+            if ("reload".startsWith(args[0].toLowerCase())) return List.of("reload");
+        }
+        return List.of();
     }
 
     private void reloadPlugin(CommandSender sender) {
