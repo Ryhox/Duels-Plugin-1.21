@@ -1,7 +1,7 @@
 name: Duels
 version: 1.0
 main: dev.duels.DuelsPlugin
-api-version: 1.21
+api-version: ${apiVersion}
 description: A complete duels plugin with queues, kits and arenas
 author: Ryhox
 
