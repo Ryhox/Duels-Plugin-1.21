@@ -268,7 +268,11 @@ public class PlayerListener implements Listener {
         player.setFallDistance(0f);
         player.setRemainingAir(player.getMaximumAir());
         player.setFreezeTicks(0);
+        player.setNoDamageTicks(0);
+        player.setInvulnerable(false);
         player.setAbsorptionAmount(0.0);
+        player.setFlying(false);
+        player.setAllowFlight(false);
 
         player.getActivePotionEffects().forEach(effect ->
                 player.removePotionEffect(effect.getType()));
@@ -284,6 +288,10 @@ public class PlayerListener implements Listener {
         player.setFallDistance(0f);
         player.setRemainingAir(player.getMaximumAir());
         player.setFreezeTicks(0);
+        player.setNoDamageTicks(0);
+        player.setInvulnerable(false);
+        player.setFlying(false);
+        player.setAllowFlight(false);
 
         player.getActivePotionEffects().forEach(effect ->
                 player.removePotionEffect(effect.getType()));

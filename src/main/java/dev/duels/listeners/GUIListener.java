@@ -35,8 +35,10 @@ public class GUIListener implements Listener {
     private final NamespacedKey duelKitKey;
     private final NamespacedKey editKitKey;
     private final NamespacedKey bestOfValueKey;
+    private final NamespacedKey customMatchValueKey;
     private final NamespacedKey duelTargetKey;
-    private final Set<UUID> awaitingStatsSearch = new java.util.HashSet<>();
+    private final Set<UUID> awaitingStatsSearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final java.util.Map<UUID, PendingMatchInput> awaitingCustomMatch = new java.util.concurrent.ConcurrentHashMap<>();
 
 
     public GUIListener(DuelsPlugin plugin) {
@@ -47,12 +49,44 @@ public class GUIListener implements Listener {
         this.duelKitKey = new NamespacedKey(plugin, "duel_kit");
         this.editKitKey = new NamespacedKey(plugin, "edit_kit");
         this.bestOfValueKey = new NamespacedKey(plugin, "bestof_value");
+        this.customMatchValueKey = new NamespacedKey(plugin, "custom_match_value");
         this.duelTargetKey = new NamespacedKey(plugin, "duel_target");
     }
     @EventHandler
     public void onChat(AsyncChatEvent event) {
         Player player = event.getPlayer();
         UUID uuid = player.getUniqueId();
+
+        PendingMatchInput pendingMatch = awaitingCustomMatch.get(uuid);
+        if (pendingMatch != null) {
+            event.setCancelled(true);
+            String msg = PlainTextComponentSerializer.plainText().serialize(event.message()).trim();
+
+            if (msg.equalsIgnoreCase("cancel")) {
+                awaitingCustomMatch.remove(uuid);
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    Player online = Bukkit.getPlayer(uuid);
+                    if (online != null) online.sendMessage(plugin.getPrefix() + "§7Match length selection cancelled.");
+                });
+                return;
+            }
+
+            int typedValue;
+            try {
+                typedValue = Integer.parseInt(msg);
+            } catch (NumberFormatException ignored) {
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    Player online = Bukkit.getPlayer(uuid);
+                    if (online != null) {
+                        online.sendMessage(plugin.getPrefix() + "§cPlease type a number or §7cancel§c.");
+                    }
+                });
+                return;
+            }
+
+            Bukkit.getScheduler().runTask(plugin, () -> submitCustomMatchValue(uuid, pendingMatch, typedValue));
+            return;
+        }
 
         if (!awaitingStatsSearch.contains(uuid)) return;
 
@@ -82,6 +116,7 @@ public class GUIListener implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         awaitingStatsSearch.remove(event.getPlayer().getUniqueId());
+        awaitingCustomMatch.remove(event.getPlayer().getUniqueId());
     }
 
     @EventHandler
@@ -254,12 +289,13 @@ public class GUIListener implements Listener {
 
         PersistentDataContainer pdc = meta.getPersistentDataContainer();
 
-        Integer bestOf = pdc.get(bestOfValueKey, PersistentDataType.INTEGER);
+        Integer matchValue = pdc.get(bestOfValueKey, PersistentDataType.INTEGER);
+        Byte customMatch = pdc.get(customMatchValueKey, PersistentDataType.BYTE);
         String kitId = pdc.get(duelKitKey, PersistentDataType.STRING);
         String targetStr = pdc.get(duelTargetKey, PersistentDataType.STRING);
 
-        if (bestOf == null || kitId == null || kitId.isEmpty() || targetStr == null || targetStr.isEmpty()) {
-            player.sendMessage(plugin.getPrefix() + "§cMissing duel data (bestof/kit/target).");
+        if ((matchValue == null && customMatch == null) || kitId == null || kitId.isEmpty() || targetStr == null || targetStr.isEmpty()) {
+            player.sendMessage(plugin.getPrefix() + "§cMissing duel data (match/kit/target).");
             player.closeInventory();
             plugin.getGuiManager().closeGUI(player.getUniqueId());
             return;
@@ -272,6 +308,17 @@ public class GUIListener implements Listener {
             player.sendMessage(plugin.getPrefix() + "§cInvalid target data.");
             player.closeInventory();
             plugin.getGuiManager().closeGUI(player.getUniqueId());
+            return;
+        }
+
+        if (customMatch != null) {
+            awaitingCustomMatch.put(player.getUniqueId(), new PendingMatchInput(targetUuid, kitId));
+            player.closeInventory();
+            plugin.getGuiManager().closeGUI(player.getUniqueId());
+            player.sendMessage(plugin.getPrefix() + "§7Type a match length between §f"
+                    + plugin.getConfigManager().getMinMatchValue() + "§7 and §f"
+                    + plugin.getConfigManager().getMaxMatchValue() + "§7, or type §ccancel§7.");
+            player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 1f);
             return;
         }
 
@@ -288,7 +335,8 @@ public class GUIListener implements Listener {
                 target.getUniqueId(),
                 kitId,
                 null,
-                bestOf
+                plugin.getConfigManager().getMatchMode(),
+                plugin.getConfigManager().clampMatchValue(matchValue)
         );
 
         plugin.getDuelManager().addDuelRequest(target.getUniqueId(), request);
@@ -298,7 +346,8 @@ public class GUIListener implements Listener {
 
         // Optional: feedback
         player.sendMessage(plugin.getPrefix() + "§7Sent duel request to §c" + target.getName()
-                + " §7| Kit: §e" + kitId + " §7| Best of §f" + bestOf);
+                + " §7| Kit: §e" + kitId + " §7| Match: §f"
+                + plugin.getConfigManager().getMatchDescription(matchValue));
         player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 1f);
     }
 
@@ -483,14 +532,15 @@ public class GUIListener implements Listener {
             return;
         }
 
-        int defaultBestOf = plugin.getConfigManager().getMainConfig().getInt("default-bestof", 1);
+        int defaultMatchValue = plugin.getConfigManager().getDefaultMatchValue();
 
         DuelRequest request = new DuelRequest(
                 player.getUniqueId(),
                 target.getUniqueId(),
                 kitId,
                 null,
-                defaultBestOf
+                plugin.getConfigManager().getMatchMode(),
+                defaultMatchValue
         );
 
         plugin.getDuelManager().addDuelRequest(target.getUniqueId(), request);
@@ -563,6 +613,47 @@ public class GUIListener implements Listener {
         }
     }
 
+    private void submitCustomMatchValue(UUID senderUuid, PendingMatchInput pending, int typedValue) {
+        Player sender = Bukkit.getPlayer(senderUuid);
+        if (sender == null || !sender.isOnline()) {
+            awaitingCustomMatch.remove(senderUuid);
+            return;
+        }
+
+        int min = plugin.getConfigManager().getMinMatchValue();
+        int max = plugin.getConfigManager().getMaxMatchValue();
+        if (typedValue < min || typedValue > max) {
+            sender.sendMessage(plugin.getPrefix() + "§cMatch length must be between §f" + min + "§c and §f" + max + "§c.");
+            sender.sendMessage(plugin.getPrefix() + "§7Type another number or §ccancel§7.");
+            return;
+        }
+
+        PendingMatchInput current = awaitingCustomMatch.remove(senderUuid);
+        if (current == null) return;
+
+        Player target = Bukkit.getPlayer(current.targetUuid);
+        if (target == null || !target.isOnline()) {
+            sender.sendMessage(plugin.getPrefix() + "§cTarget player is offline.");
+            return;
+        }
+
+        int matchValue = plugin.getConfigManager().clampMatchValue(typedValue);
+        DuelRequest request = new DuelRequest(
+                sender.getUniqueId(),
+                target.getUniqueId(),
+                current.kitId,
+                null,
+                plugin.getConfigManager().getMatchMode(),
+                matchValue
+        );
+
+        plugin.getDuelManager().addDuelRequest(target.getUniqueId(), request);
+        sender.sendMessage(plugin.getPrefix() + "§7Sent duel request to §c" + target.getName()
+                + " §7| Kit: §e" + current.kitId + " §7| Match: §f"
+                + plugin.getConfigManager().getMatchDescription(matchValue));
+        sender.playSound(sender.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 1f);
+    }
+
     @EventHandler
     public void onInventoryDrag(InventoryDragEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
@@ -609,5 +700,13 @@ public class GUIListener implements Listener {
         return (kitId == null || kitId.isEmpty()) ? null : kitId;
     }
 
-}
+    private static class PendingMatchInput {
+        private final UUID targetUuid;
+        private final String kitId;
 
+        private PendingMatchInput(UUID targetUuid, String kitId) {
+            this.targetUuid = targetUuid;
+            this.kitId = kitId;
+        }
+    }
+}

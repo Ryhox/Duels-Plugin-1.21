@@ -3,6 +3,7 @@ package dev.duels.managers;
 import dev.duels.DuelsPlugin;
 import dev.duels.objects.*;
 import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
@@ -61,14 +62,20 @@ public class DuelManager {
         }
 
         if (arena == null) {
-            arena = plugin.getArenaManager().getRandomAvailableArena();
+            arena = plugin.getArenaManager().getAvailableArenaForKit(request.getKitName());
             if (arena == null) {
-                player1.sendMessage(plugin.getPrefix() + "§cNo available arenas!");
-                player2.sendMessage(plugin.getPrefix() + "§cNo available arenas!");
+                String failure = plugin.getArenaManager().getArenaSelectionFailure(request.getKitName());
+                player1.sendMessage(plugin.getPrefix() + failure);
+                player2.sendMessage(plugin.getPrefix() + failure);
                 return;
             }
             arena.setInUse(true);
         } else {
+            if (!plugin.getArenaManager().isArenaReady(arena)) {
+                player1.sendMessage(plugin.getPrefix() + "§cSelected arena is not fully set up: §e" + arena.getName());
+                player2.sendMessage(plugin.getPrefix() + "§cSelected arena is not fully set up: §e" + arena.getName());
+                return;
+            }
             arena.setInUse(true);
         }
 
@@ -78,7 +85,8 @@ public class DuelManager {
                 request.getKitName(),
                 arena.getName(),
                 plugin.getConfigManager().getMainConfig().getInt("duel-time", 180),
-                request.getBestOf()
+                request.getMatchMode(),
+                request.getMatchValue()
         );
 
         activeDuels.put(player1.getUniqueId(), session);
@@ -132,11 +140,11 @@ public class DuelManager {
 
         p1.sendMessage(plugin.getPrefix() + "§aDuel started §7against §c" + p2.getName() + "!");
         p1.sendMessage(plugin.getPrefix() + "§7Kit: §r" + kitDisplay + " §7| Arena: §b" + session.getArenaName());
-        p1.sendMessage(plugin.getPrefix() + "§dMatch: §fBest of " + session.getBestOf() + " §7(need " + session.requiredWins() + " wins)");
+        p1.sendMessage(plugin.getPrefix() + "§dMatch: §f" + session.getMatchDescription() + " §7(need " + session.requiredWins() + " wins)");
 
         p2.sendMessage(plugin.getPrefix() + "§aDuel started §7against §c" + p1.getName() + "!");
         p2.sendMessage(plugin.getPrefix() + "§7Kit: §r" + kitDisplay + " §7| Arena: §b" + session.getArenaName());
-        p2.sendMessage(plugin.getPrefix() + "§dMatch: §fBest of " + session.getBestOf() + " §7(need " + session.requiredWins() + " wins)");
+        p2.sendMessage(plugin.getPrefix() + "§dMatch: §f" + session.getMatchDescription() + " §7(need " + session.requiredWins() + " wins)");
     }
 
     private void startDuelCountdown(Player p1, Player p2, DuelSession session) {
@@ -161,8 +169,8 @@ public class DuelManager {
 
                     time--;
                 } else {
-                    p1.sendTitle("§aFIGHT!", "§7Best of " + session.getBestOf(), 0, 20, 10);
-                    p2.sendTitle("§aFIGHT!", "§7Best of " + session.getBestOf(), 0, 20, 10);
+                    p1.sendTitle("§aFIGHT!", "§7" + session.getMatchDescription(), 0, 20, 10);
+                    p2.sendTitle("§aFIGHT!", "§7" + session.getMatchDescription(), 0, 20, 10);
 
                     p1.playSound(p1.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 0.5f, 1.5f);
                     p2.playSound(p2.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 0.5f, 1.5f);
@@ -201,6 +209,9 @@ public class DuelManager {
             endDuel(deadId, killer, true);
             return;
         }
+
+        frozenPlayers.add(deadId);
+        frozenPlayers.add(winnerId);
 
         if (session.getPlayer1().equals(winnerId)) {
             session.setWinsP1(session.getWinsP1() + 1);
@@ -308,8 +319,8 @@ public class DuelManager {
 
                     time--;
                 } else {
-                    p1.sendTitle("§aFIGHT!", "§7Best of " + session.getBestOf(), 0, 20, 10);
-                    p2.sendTitle("§aFIGHT!", "§7Best of " + session.getBestOf(), 0, 20, 10);
+                    p1.sendTitle("§aFIGHT!", "§7" + session.getMatchDescription(), 0, 20, 10);
+                    p2.sendTitle("§aFIGHT!", "§7" + session.getMatchDescription(), 0, 20, 10);
 
                     p1.playSound(p1.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 0.5f, 1.5f);
                     p2.playSound(p2.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 0.5f, 1.5f);
@@ -470,6 +481,14 @@ public class DuelManager {
         player.setSaturation(20f);
         player.setFireTicks(0);
         player.setFallDistance(0f);
+        player.setRemainingAir(player.getMaximumAir());
+        player.setFreezeTicks(0);
+        player.setNoDamageTicks(0);
+        player.setInvulnerable(false);
+        player.setAbsorptionAmount(0.0);
+        player.setGameMode(GameMode.SURVIVAL);
+        player.setFlying(false);
+        player.setAllowFlight(false);
 
         for (PotionEffect effect : player.getActivePotionEffects()) {
             player.removePotionEffect(effect.getType());
@@ -477,6 +496,14 @@ public class DuelManager {
     }
 
     public void cleanupDuel(UUID player1, UUID player2) {
+        DuelSession session = activeDuels.get(player1);
+        if (session == null && player2 != null) {
+            session = activeDuels.get(player2);
+        }
+        if (session != null) {
+            releaseArenaReservation(session.getArenaName());
+        }
+
         activeDuels.remove(player1);
         if (player2 != null) activeDuels.remove(player2);
 
@@ -495,6 +522,9 @@ public class DuelManager {
     public void cleanupAll() {
         for (DuelSession session : new HashSet<>(activeDuels.values())) {
             cleanupDuel(session.getPlayer1(), session.getPlayer2());
+        }
+        for (DuelRequest request : new HashSet<>(duelRequests.values())) {
+            releaseArenaReservation(request);
         }
         activeDuels.clear();
         duelRequests.clear();
@@ -546,31 +576,14 @@ public class DuelManager {
 
         // Free old reserved arena
         DuelRequest old = duelRequests.remove(target);
-        if (old != null) {
-            Arena oldArena = plugin.getArenaManager().getArena(old.getArenaName());
-            if (oldArena != null) oldArena.setInUse(false);
-        }
+        releaseArenaReservation(old);
 
-        // Prefer kit-bound arena, fall back to random
-        String kitId = request.getKitName();
-        String boundArenaName = plugin.getArenaManager().getKitArenaBinding(kitId);
-        Arena chosen = null;
-
-        if (boundArenaName != null) {
-            Arena boundArena = plugin.getArenaManager().getArena(boundArenaName);
-            if (boundArena != null && !boundArena.isInUse() && boundArena.hasSnapshot()
-                    && boundArena.getSpawn1() != null && boundArena.getSpawn2() != null) {
-                chosen = boundArena;
-            }
-        }
+        Arena chosen = plugin.getArenaManager().getAvailableArenaForKit(request.getKitName());
 
         if (chosen == null) {
-            chosen = plugin.getArenaManager().getRandomAvailableArena();
-        }
-
-        if (chosen == null) {
-            if (sender != null) sender.sendMessage(plugin.getPrefix() + "§cNo available arenas!");
-            if (receiver != null) receiver.sendMessage(plugin.getPrefix() + "§cNo available arenas!");
+            String failure = plugin.getArenaManager().getArenaSelectionFailure(request.getKitName());
+            if (sender != null) sender.sendMessage(plugin.getPrefix() + failure);
+            if (receiver != null) receiver.sendMessage(plugin.getPrefix() + failure);
             return;
         }
         chosen.setInUse(true);
@@ -580,7 +593,8 @@ public class DuelManager {
                 request.getTarget(),
                 request.getKitName(),
                 chosen.getName(),
-                request.getBestOf()
+                request.getMatchMode(),
+                request.getMatchValue()
         );
 
         duelRequests.put(target, stored);
@@ -590,14 +604,14 @@ public class DuelManager {
         if (sender != null && sender.isOnline()) {
             sender.sendMessage("\n" + plugin.getPrefix() + "§aDuel request sent to §e" + (receiver != null ? receiver.getName() : "player") + "\n" +
                     plugin.getPrefix() + "§7Kit: §r" + kitDisplay + "§7 | Arena: §b" + chosen.getName() + "§7\n" +
-                    plugin.getPrefix() + "§7Best of §f" + stored.getBestOf());
+                    plugin.getPrefix() + "§7Match: §f" + stored.getMatchDescription());
         }
 
         if (receiver != null && receiver.isOnline()) {
             receiver.sendMessage("\n" + plugin.getPrefix() + "§e" + (sender != null ? sender.getName() : "Someone") +
                     " §7challenged you!\n" +
                     plugin.getPrefix() + "§7Kit: §r" + kitDisplay + "§7 | Arena: §b" + chosen.getName() + "§7\n" +
-                    plugin.getPrefix() + "§7Best of §f" + stored.getBestOf());
+                    plugin.getPrefix() + "§7Match: §f" + stored.getMatchDescription());
 
             receiver.playSound(receiver.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
 
@@ -626,19 +640,21 @@ public class DuelManager {
             target.sendMessage(plugin.getPrefix() + "§cNo pending duel request.");
             return;
         }
-        if (request.isExpired(30)) {
-            Arena a = plugin.getArenaManager().getArena(request.getArenaName());
-            if (a != null) a.setInUse(false);
+        int timeout = plugin.getConfigManager().getMainConfig().getInt("request-timeout", 30);
+        if (request.isExpired(timeout)) {
+            releaseArenaReservation(request);
             target.sendMessage(plugin.getPrefix() + "§cDuel request expired.");
             return;
         }
         Player sender = Bukkit.getPlayer(request.getSender());
         if (sender == null || !sender.isOnline()) {
+            releaseArenaReservation(request);
             target.sendMessage(plugin.getPrefix() + "§cRequester is offline.");
             return;
         }
 
         if (isInDuel(sender.getUniqueId()) || isInDuel(target.getUniqueId())) {
+            releaseArenaReservation(request);
             target.sendMessage(plugin.getPrefix() + "§cSomeone is already in a duel.");
             return;
         }
@@ -658,8 +674,7 @@ public class DuelManager {
             sender.sendMessage(plugin.getPrefix() + "§cYour duel request was denied.");
         }
         target.sendMessage(plugin.getPrefix() + "§7Request denied.");
-        Arena a = plugin.getArenaManager().getArena(request.getArenaName());
-        if (a != null) a.setInUse(false);
+        releaseArenaReservation(request);
     }
 
     public DuelRequest getDuelRequest(UUID target) {
@@ -667,7 +682,19 @@ public class DuelManager {
     }
 
     public void removeDuelRequest(UUID target) {
-        duelRequests.remove(target);
+        DuelRequest removed = duelRequests.remove(target);
+        releaseArenaReservation(removed);
+    }
+
+    private void releaseArenaReservation(DuelRequest request) {
+        if (request == null || request.getArenaName() == null) return;
+        releaseArenaReservation(request.getArenaName());
+    }
+
+    private void releaseArenaReservation(String arenaName) {
+        if (arenaName == null) return;
+        Arena arena = plugin.getArenaManager().getArena(arenaName);
+        if (arena != null) arena.setInUse(false);
     }
 
     public int getActiveDuelCount() {

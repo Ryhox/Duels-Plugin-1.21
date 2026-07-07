@@ -1,4 +1,39 @@
-.idea/
-build/
-*.iml
+# Gradle / build output
 .gradle/
+build/
+out/
+
+# IDE
+.idea/
+*.iml
+
+# Local Paper / run-paper server state
+run/
+server/
+logs/
+plugins/
+world/
+world_*/
+crash-reports/
+eula.txt
+*.jar
+
+# Codex / agent-local artifacts
+.codex/
+.agents/
+.ai/
+codex/
+skills/
+agent-output/
+ai-output/
+**/SKILL.md
+SKILL.md
+/AGENTS.md
+/CLAUDE.md
+/GEMINI.md
+/CODEX*.md
+/codex*.md
+/.codex-*.md
+/*skill*.md
+/*agent*.md
+/*ai*.md

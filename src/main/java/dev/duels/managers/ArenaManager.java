@@ -212,15 +212,58 @@ public class ArenaManager {
     public Arena getRandomAvailableArena() {
         List<Arena> available = new ArrayList<>();
         for (Arena arena : arenas.values()) {
-            if (!arena.isInUse() && arena.hasSnapshot() &&
-                    arena.getSpawn1() != null && arena.getSpawn2() != null &&
-                    arena.getCorner1() != null && arena.getCorner2() != null) {
+            if (!arena.isInUse() && isArenaReady(arena)) {
                 available.add(arena);
             }
         }
 
         if (available.isEmpty()) return null;
         return available.get(new Random().nextInt(available.size()));
+    }
+
+    public Arena getAvailableArenaForKit(String kitId) {
+        String boundArenaName = getKitArenaBinding(kitId);
+        if (boundArenaName != null) {
+            Arena boundArena = getArena(boundArenaName);
+            if (boundArena != null && !boundArena.isInUse() && isArenaReady(boundArena)) {
+                return boundArena;
+            }
+
+            if (!plugin.getConfigManager().allowBoundArenaRandomFallback()) {
+                return null;
+            }
+        }
+
+        return getRandomAvailableArena();
+    }
+
+    public boolean isArenaReady(Arena arena) {
+        return arena != null
+                && arena.hasSnapshot()
+                && arena.getSpawn1() != null
+                && arena.getSpawn2() != null
+                && arena.getCorner1() != null
+                && arena.getCorner2() != null;
+    }
+
+    public String getArenaSelectionFailure(String kitId) {
+        String boundArenaName = getKitArenaBinding(kitId);
+        if (boundArenaName == null || plugin.getConfigManager().allowBoundArenaRandomFallback()) {
+            return "§cNo available arenas!";
+        }
+
+        Arena boundArena = getArena(boundArenaName);
+        if (boundArena == null) {
+            return "§cThe arena bound to this kit does not exist: §e" + boundArenaName;
+        }
+        if (boundArena.isInUse()) {
+            return "§cThe arena bound to this kit is currently in use: §e" + boundArenaName;
+        }
+        if (!isArenaReady(boundArena)) {
+            return "§cThe arena bound to this kit is not fully set up: §e" + boundArenaName;
+        }
+
+        return "§cNo available arenas!";
     }
 
     public String reserveRandomFreeArenaName() {

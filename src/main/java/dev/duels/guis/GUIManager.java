@@ -37,6 +37,7 @@ public class GUIManager {
     private final NamespacedKey duelKitKey;
     private final NamespacedKey editKitKey;
     private final NamespacedKey bestOfValueKey;
+    private final NamespacedKey customMatchValueKey;
 
     public GUIManager(DuelsPlugin plugin) {
         this.plugin = plugin;
@@ -46,6 +47,7 @@ public class GUIManager {
         this.duelKitKey = new NamespacedKey(plugin, "duel_kit");
         this.editKitKey = new NamespacedKey(plugin, "edit_kit");
         this.bestOfValueKey = new NamespacedKey(plugin, "bestof_value");
+        this.customMatchValueKey = new NamespacedKey(plugin, "custom_match_value");
         this.duelTargetKey = new NamespacedKey(plugin, "duel_target");
 
     }
@@ -106,6 +108,8 @@ public class GUIManager {
                 int playing = plugin.getQueueManager().getPlayingCount(kitId);
                 int sum = queued + playing;
                 boolean queuedByViewer = plugin.getQueueManager().isInQueue(viewer.getUniqueId(), kitId);
+                String boundArena = plugin.getArenaManager().getKitArenaBinding(kitId);
+                String arenaLine = boundArena == null ? "§7Arena: §bRandom" : "§7Arena: §b" + boundArena;
 
                 ItemStack kitItem = new ItemStack(previewMat);
                 kitItem.setAmount(Math.max(1, Math.min(64, sum)));
@@ -117,6 +121,7 @@ public class GUIManager {
                 meta.setLore(Arrays.asList(
                         "§7In Queue: §a" + queued,
                         "§7Playing: §6" + playing,
+                        arenaLine,
                         "",
                         queuedByViewer ? "§cClick to leave queue" : "§eClick to join queue"
                 ));
@@ -264,14 +269,18 @@ public class GUIManager {
                 meta.setDisplayName(display);
 
                 int itemCount = kit != null ? kit.getItems().size() : 0;
-                int defaultBestOf = plugin.getConfigManager().getMainConfig().getInt("default-bestof", 1);
+                int defaultMatchValue = plugin.getConfigManager().getDefaultMatchValue();
+                String defaultMatch = plugin.getConfigManager().getMatchDescription(defaultMatchValue);
+                String boundArena = plugin.getArenaManager().getKitArenaBinding(kitId);
+                String arenaLine = boundArena == null ? "§7Arena: §bRandom" : "§7Arena: §b" + boundArena;
 
                 meta.setLore(Arrays.asList(
                         "§7Challenge §c" + target.getName() + " §7with this kit",
                         "§7Contains " + itemCount + " items",
+                        arenaLine,
                         "",
-                        "§aLeft-Click §7= send request §8(Best of " + defaultBestOf + ")",
-                        "§eRight-Click §7= choose Best-Of"
+                        "§aLeft-Click §7= send request §8(" + defaultMatch + ")",
+                        "§eRight-Click §7= choose match length"
                 ));
 
                 meta.getPersistentDataContainer().set(duelKitKey, PersistentDataType.STRING, kitId);
@@ -288,7 +297,7 @@ public class GUIManager {
         }
 
         ItemStack info = createItem(Material.PAPER, "§6Select a Kit",
-                Arrays.asList("§7Choose a kit to challenge", "§7" + target.getName() + " with.", "", "§eLeft=send  §eRight=best-of"));
+                Arrays.asList("§7Choose a kit to challenge", "§7" + target.getName() + " with.", "", "§eLeft=send  §eRight=length"));
 
         ItemMeta infoMeta = info.getItemMeta();
         infoMeta.getPersistentDataContainer().set(duelTargetKey, PersistentDataType.STRING, target.getUniqueId().toString());
@@ -303,26 +312,43 @@ public class GUIManager {
         KitManager.Kit kit = plugin.getKitManager().getKit(kitId);
         String display = kit != null ? kit.getDisplayName() : kitId;
 
-        List<Integer> options = plugin.getConfigManager().getMainConfig().getIntegerList("bestof-options");
-        if (options == null || options.isEmpty()) options = Arrays.asList(1, 3, 5);
+        List<Integer> options = plugin.getConfigManager().getMatchOptions();
 
-        int slot = 10;
-        for (int bestOf : options) {
-            if (slot >= 17) break;
+        int[] optionSlots = {10, 11, 12, 13, 14, 15};
+        int optionIndex = 0;
+        for (int matchValue : options) {
+            if (optionIndex >= optionSlots.length) break;
+            String matchDescription = plugin.getConfigManager().getMatchDescription(matchValue);
 
-            ItemStack item = createItem(Material.PAPER, "§eBest of " + bestOf,
+            ItemStack item = createItem(Material.PAPER, "§e" + matchDescription,
                     Arrays.asList("§7Kit: §b" + display, "§7Target: §c" + target.getName(), "", "§eClick to choose"));
 
             ItemMeta meta = item.getItemMeta();
-            meta.getPersistentDataContainer().set(bestOfValueKey, PersistentDataType.INTEGER, bestOf);
+            meta.getPersistentDataContainer().set(bestOfValueKey, PersistentDataType.INTEGER, matchValue);
             meta.getPersistentDataContainer().set(duelKitKey, PersistentDataType.STRING, kitId);
             meta.getPersistentDataContainer().set(duelTargetKey, PersistentDataType.STRING, target.getUniqueId().toString());
             item.setItemMeta(meta);
 
 
-            inv.setItem(slot, item);
-            slot++;
+            inv.setItem(optionSlots[optionIndex], item);
+            optionIndex++;
         }
+
+        ItemStack custom = createItem(Material.NAME_TAG, "§bCustom Match Length",
+                Arrays.asList(
+                        "§7Kit: §b" + display,
+                        "§7Target: §c" + target.getName(),
+                        "§7Allowed: §f" + plugin.getConfigManager().getMinMatchValue()
+                                + "§7-§f" + plugin.getConfigManager().getMaxMatchValue(),
+                        "",
+                        "§eClick to type a value"
+                ));
+        ItemMeta customMeta = custom.getItemMeta();
+        customMeta.getPersistentDataContainer().set(customMatchValueKey, PersistentDataType.BYTE, (byte) 1);
+        customMeta.getPersistentDataContainer().set(duelKitKey, PersistentDataType.STRING, kitId);
+        customMeta.getPersistentDataContainer().set(duelTargetKey, PersistentDataType.STRING, target.getUniqueId().toString());
+        custom.setItemMeta(customMeta);
+        inv.setItem(16, custom);
 
         ItemStack back = createItem(Material.ARROW, "§cBack", null);
         inv.setItem(18, back);

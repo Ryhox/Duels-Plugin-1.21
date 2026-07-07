@@ -94,35 +94,25 @@ public class QueueManager {
     }
 
     private void startQueueMatch(Player player1, Player player2, String kitName) {
-        // Check for kit-bound arena first, fall back to random
-        dev.duels.objects.Arena arena = null;
-        String boundArenaName = plugin.getArenaManager().getKitArenaBinding(kitName);
-        if (boundArenaName != null) {
-            dev.duels.objects.Arena bound = plugin.getArenaManager().getArena(boundArenaName);
-            if (bound != null && !bound.isInUse() && bound.hasSnapshot()
-                    && bound.getSpawn1() != null && bound.getSpawn2() != null) {
-                arena = bound;
-            }
-        }
+        dev.duels.objects.Arena arena = plugin.getArenaManager().getAvailableArenaForKit(kitName);
         if (arena == null) {
-            arena = plugin.getArenaManager().getRandomAvailableArena();
-        }
-        if (arena == null) {
-            player1.sendMessage(plugin.getPrefix() + "§cNo available arenas!");
-            player2.sendMessage(plugin.getPrefix() + "§cNo available arenas!");
+            String failure = plugin.getArenaManager().getArenaSelectionFailure(kitName);
+            player1.sendMessage(plugin.getPrefix() + failure);
+            player2.sendMessage(plugin.getPrefix() + failure);
             joinQueue(player1, kitName);
             joinQueue(player2, kitName);
             return;
         }
 
         // DuelRequest erstellen
-        int bestOf = plugin.getConfigManager().getMainConfig().getInt("default-bestof", 3);
+        int matchValue = plugin.getConfigManager().getDefaultMatchValue();
         DuelRequest request = new DuelRequest(
                 player1.getUniqueId(),
                 player2.getUniqueId(),
                 kitName,
                 arena.getName(),
-                bestOf
+                plugin.getConfigManager().getMatchMode(),
+                matchValue
         );
 
         // Duel starten

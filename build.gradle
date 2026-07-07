@@ -48,6 +48,7 @@ processResources {
 // --- 1.21 jar ---
 
 task processResources121(type: Copy) {
+    inputs.properties([version: project.version, apiVersion: '1.21'])
     from 'src/main/resources'
     into "${buildDir}/resources-121"
     filteringCharset 'UTF-8'
@@ -63,22 +64,22 @@ task jar121(type: Jar) {
     from "${buildDir}/resources-121"
 }
 
-// --- 26.x jar (covers 26.1, 26.1.1, 26.1.2, ...) ---
-// Compiled against the 1.21 API (Java 21 bytecode runs fine on Java 25+ JVM).
-// api-version: 26.1 → loads on any 26.1.x server.
+// --- 26.2 jar ---
+// Compiled with Java 21 bytecode for current Paper 26.2 test servers.
 
 task processResources26(type: Copy) {
+    inputs.properties([version: project.version, apiVersion: '26.2'])
     from 'src/main/resources'
     into "${buildDir}/resources-26"
     filteringCharset 'UTF-8'
     filesMatching('plugin.yml') {
-        expand([version: project.version, apiVersion: '26.1'])
+        expand([version: project.version, apiVersion: '26.2'])
     }
 }
 
 task jar26(type: Jar) {
     dependsOn compileJava, processResources26
-    archiveFileName.set('Duels-26.x.jar')
+    archiveFileName.set('Duels-26.2.jar')
     from sourceSets.main.output.classesDirs
     from "${buildDir}/resources-26"
 }

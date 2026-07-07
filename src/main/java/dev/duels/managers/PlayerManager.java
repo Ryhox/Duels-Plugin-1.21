@@ -283,7 +283,11 @@ public List<PlayerData> getAllPlayerDataSnapshot() {
         player.setFallDistance(0f);
         player.setRemainingAir(player.getMaximumAir());
         player.setFreezeTicks(0);
+        player.setNoDamageTicks(0);
+        player.setInvulnerable(false);
         player.setAbsorptionAmount(0.0);
+        player.setFlying(false);
+        player.setAllowFlight(false);
 
         // Potion Effects entfernen
         player.getActivePotionEffects().forEach(effect ->
