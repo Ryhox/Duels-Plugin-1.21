@@ -25,7 +25,7 @@ public class GUIManager {
     public static final String QUEUE_GUI_TITLE = "§aSelect a Kit §8(Queue)";
     public static final String KITS_GUI_TITLE = "§bAvailable Kits";
     public static final String DUEL_GUI_TITLE = "§aSelect a Kit";
-    public static final String BESTOF_GUI_TITLE = "§dSelect Match Length";
+    public static final String MATCH_LENGTH_GUI_TITLE = "§dSelect Match Length";
     public static final String SETTINGS_GUI_TITLE = "§cSettings";
     public static final String STATS_GUI_TITLE = "§bYour Stats";
     public static final String EDIT_LAYOUTS_GUI_TITLE = "§6Edit Kit Inventory Layouts";
@@ -36,7 +36,7 @@ public class GUIManager {
     private final NamespacedKey previewKitKey;
     private final NamespacedKey duelKitKey;
     private final NamespacedKey editKitKey;
-    private final NamespacedKey bestOfValueKey;
+    private final NamespacedKey matchValueKey;
     private final NamespacedKey customMatchValueKey;
 
     public GUIManager(DuelsPlugin plugin) {
@@ -46,7 +46,7 @@ public class GUIManager {
         this.previewKitKey = new NamespacedKey(plugin, "preview_kit");
         this.duelKitKey = new NamespacedKey(plugin, "duel_kit");
         this.editKitKey = new NamespacedKey(plugin, "edit_kit");
-        this.bestOfValueKey = new NamespacedKey(plugin, "bestof_value");
+        this.matchValueKey = new NamespacedKey(plugin, "match_value");
         this.customMatchValueKey = new NamespacedKey(plugin, "custom_match_value");
         this.duelTargetKey = new NamespacedKey(plugin, "duel_target");
 
@@ -306,8 +306,8 @@ public class GUIManager {
         inv.setItem(4, info);
     }
 
-    public void openBestOfGUI(Player sender, Player target, String kitId) {
-        Inventory inv = Bukkit.createInventory(null, 27, BESTOF_GUI_TITLE);
+    public void openMatchLengthGUI(Player sender, Player target, String kitId) {
+        Inventory inv = Bukkit.createInventory(null, 27, MATCH_LENGTH_GUI_TITLE);
 
         KitManager.Kit kit = plugin.getKitManager().getKit(kitId);
         String display = kit != null ? kit.getDisplayName() : kitId;
@@ -324,7 +324,7 @@ public class GUIManager {
                     Arrays.asList("§7Kit: §b" + display, "§7Target: §c" + target.getName(), "", "§eClick to choose"));
 
             ItemMeta meta = item.getItemMeta();
-            meta.getPersistentDataContainer().set(bestOfValueKey, PersistentDataType.INTEGER, matchValue);
+            meta.getPersistentDataContainer().set(matchValueKey, PersistentDataType.INTEGER, matchValue);
             meta.getPersistentDataContainer().set(duelKitKey, PersistentDataType.STRING, kitId);
             meta.getPersistentDataContainer().set(duelTargetKey, PersistentDataType.STRING, target.getUniqueId().toString());
             item.setItemMeta(meta);
@@ -357,7 +357,7 @@ public class GUIManager {
         inv.setItem(26, close);
 
         sender.openInventory(inv);
-        openGUIs.put(sender.getUniqueId(), new GUI(BESTOF_GUI_TITLE, System.currentTimeMillis()));
+        openGUIs.put(sender.getUniqueId(), new GUI(MATCH_LENGTH_GUI_TITLE, System.currentTimeMillis()));
     }
 
     public void openSettingsGUI(Player player) {

@@ -35,7 +35,6 @@
         public String getKitName() { return kitName; }
         public DuelSession.MatchMode getMatchMode() { return matchMode; }
         public int getMatchValue() { return matchValue; }
-        public int getBestOf() { return matchValue; }
         public long getTimestamp() { return timestamp; }
         public String getArenaName() {return arenaName; }
         public String getMatchDescription() {

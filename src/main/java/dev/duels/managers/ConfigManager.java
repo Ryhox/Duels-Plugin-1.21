@@ -146,14 +146,6 @@ public class ConfigManager {
             mainConfig.set("default-map", "§cᴅᴜᴇʟѕ ᴍᴀᴘ");
             changed = true;
         }
-        if (!mainConfig.contains("default-bestof")) {
-            mainConfig.set("default-bestof", 3);
-            changed = true;
-        }
-        if (!mainConfig.contains("bestof-options")) {
-            mainConfig.set("bestof-options", java.util.Arrays.asList(1, 3, 5, 10));
-            changed = true;
-        }
         if (!mainConfig.contains("match-mode")) {
             mainConfig.set("match-mode", "first-to");
             changed = true;

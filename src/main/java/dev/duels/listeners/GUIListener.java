@@ -18,6 +18,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
 import dev.duels.objects.DuelRequest;
 import io.papermc.paper.event.player.AsyncChatEvent;
@@ -28,13 +29,16 @@ import java.util.List;
 
 public class GUIListener implements Listener {
 
+    private static final int PLAYER_LAYOUT_SIZE = 36;
+    private static final int HOTBAR_SIZE = 9;
+
     private final DuelsPlugin plugin;
 
     private final NamespacedKey queueKitKey;
     private final NamespacedKey previewKitKey;
     private final NamespacedKey duelKitKey;
     private final NamespacedKey editKitKey;
-    private final NamespacedKey bestOfValueKey;
+    private final NamespacedKey matchValueKey;
     private final NamespacedKey customMatchValueKey;
     private final NamespacedKey duelTargetKey;
     private final Set<UUID> awaitingStatsSearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
@@ -48,7 +52,7 @@ public class GUIListener implements Listener {
         this.previewKitKey = new NamespacedKey(plugin, "preview_kit");
         this.duelKitKey = new NamespacedKey(plugin, "duel_kit");
         this.editKitKey = new NamespacedKey(plugin, "edit_kit");
-        this.bestOfValueKey = new NamespacedKey(plugin, "bestof_value");
+        this.matchValueKey = new NamespacedKey(plugin, "match_value");
         this.customMatchValueKey = new NamespacedKey(plugin, "custom_match_value");
         this.duelTargetKey = new NamespacedKey(plugin, "duel_target");
     }
@@ -138,9 +142,8 @@ public class GUIListener implements Listener {
             return;
         }
 
-        // BestOf GUI
-        if (title.equals(GUIManager.BESTOF_GUI_TITLE)) {
-            handleBestOfGUIClick(event, player, top, clickedInv);
+        if (title.equals(GUIManager.MATCH_LENGTH_GUI_TITLE)) {
+            handleMatchLengthGUIClick(event, player, top, clickedInv);
             return;
         }
 
@@ -270,7 +273,7 @@ public class GUIListener implements Listener {
     }
 
 
-    private void handleBestOfGUIClick(InventoryClickEvent event, Player player, Inventory top, Inventory clickedInv) {
+    private void handleMatchLengthGUIClick(InventoryClickEvent event, Player player, Inventory top, Inventory clickedInv) {
         event.setCancelled(true);
         if (clickedInv != top) return;
 
@@ -289,7 +292,7 @@ public class GUIListener implements Listener {
 
         PersistentDataContainer pdc = meta.getPersistentDataContainer();
 
-        Integer matchValue = pdc.get(bestOfValueKey, PersistentDataType.INTEGER);
+        Integer matchValue = pdc.get(matchValueKey, PersistentDataType.INTEGER);
         Byte customMatch = pdc.get(customMatchValueKey, PersistentDataType.BYTE);
         String kitId = pdc.get(duelKitKey, PersistentDataType.STRING);
         String targetStr = pdc.get(duelTargetKey, PersistentDataType.STRING);
@@ -361,51 +364,40 @@ public class GUIListener implements Listener {
             return;
         }
 
-        // Zahlentasten / Offhand / Doubleclick / Middle blocken (Dupe/Weird)
-        switch (event.getClick()) {
-            case NUMBER_KEY:
-            case SWAP_OFFHAND:
-            case DOUBLE_CLICK:
-            case MIDDLE:
-                event.setCancelled(true);
-                return;
-            default:
-                break;
+        // Block clicks that can bypass the layout grid.
+        ClickType click = event.getClick();
+        if (click == ClickType.NUMBER_KEY
+                || click == ClickType.SWAP_OFFHAND
+                || click == ClickType.DOUBLE_CLICK
+                || click == ClickType.MIDDLE) {
+            event.setCancelled(true);
+            return;
         }
 
-        // Klick im Player-Inventar (bottom): alles ignorieren, aber Hotbar 0-8 sperren
+        // Bottom inventory clicks should not pull lobby tools into the layout.
         if (clickedInv != null && clickedInv.equals(event.getView().getBottomInventory())) {
-            int slot = event.getSlot(); // 0-35 bottom
-            if (slot >= 0 && slot <= 8) {
+            int slot = event.getSlot();
+            if (slot >= 0 && slot < HOTBAR_SIZE) {
                 event.setCancelled(true);
             }
             return;
         }
 
-        // Nur Top-Inventar behandeln
         if (clickedInv != top) return;
 
-        // Buttons (unten rechts): 51/52/53
-        if (raw == 51 || raw == 52 || raw == 53) {
+        ItemStack clicked = event.getCurrentItem();
+        ItemMeta clickedMeta = clicked != null && clicked.hasItemMeta() ? clicked.getItemMeta() : null;
+        String name = clickedMeta != null && clickedMeta.hasDisplayName() ? clickedMeta.getDisplayName() : "";
+        String buttonKitId = getEditLayoutKitId(clickedMeta);
+
+        if (buttonKitId != null && isEditLayoutButton(name)) {
             event.setCancelled(true);
 
-            ItemStack button = event.getCurrentItem();
-            if (button == null || !button.hasItemMeta()) return;
-
-            String kitId = getEditLayoutKitId(top); // liest Slot 45
-            if (kitId == null) {
-                player.sendMessage(plugin.getPrefix() + "§cCould not detect kit id for this layout.");
-                player.closeInventory();
-                plugin.getGuiManager().closeGUI(player.getUniqueId());
-                return;
-            }
-
-            String name = button.getItemMeta().getDisplayName();
-            if (name == null) name = "";
+            String kitId = buttonKitId;
 
             if (name.contains("§aSave Layout")) {
-                ItemStack[] layout = new ItemStack[36];
-                for (int i = 0; i < 36; i++) {
+                ItemStack[] layout = new ItemStack[PLAYER_LAYOUT_SIZE];
+                for (int i = 0; i < PLAYER_LAYOUT_SIZE; i++) {
                     ItemStack it = top.getItem(i);
                     layout[i] = (it == null || it.getType() == Material.AIR) ? null : it.clone();
                 }
@@ -440,20 +432,7 @@ public class GUIListener implements Listener {
             return;
         }
 
-        // Sperre Armor/Offhand-Anzeige 36-40 (und allgemein 36-44)
-        if (raw >= 36 && raw <= 44) {
-            event.setCancelled(true);
-            return;
-        }
-
-        // Info-Paper Slot 45 sperren (damit kitId drin bleibt)
-        if (raw == 45) {
-            event.setCancelled(true);
-            return;
-        }
-
-        // Rest unten (46-50, 54er GUI-filler usw.) sperren
-        if (raw >= 46) {
+        if (raw >= PLAYER_LAYOUT_SIZE) {
             event.setCancelled(true);
             return;
         }
@@ -528,7 +507,7 @@ public class GUIListener implements Listener {
         }
 
         if (event.getClick().isRightClick()) {
-            plugin.getGuiManager().openBestOfGUI(player, target, kitId);
+            plugin.getGuiManager().openMatchLengthGUI(player, target, kitId);
             return;
         }
 
@@ -681,7 +660,7 @@ public class GUIListener implements Listener {
 
         // Block drags in other plugin GUIs
         if (title.equals(GUIManager.QUEUE_GUI_TITLE)
-                || title.equals(GUIManager.BESTOF_GUI_TITLE)
+                || title.equals(GUIManager.MATCH_LENGTH_GUI_TITLE)
                 || title.equals(GUIManager.EDIT_LAYOUTS_GUI_TITLE)
                 || title.equals(GUIManager.DUEL_GUI_TITLE)
                 || title.equals(GUIManager.KITS_GUI_TITLE)
@@ -691,11 +670,15 @@ public class GUIListener implements Listener {
         }
     }
 
-    private String getEditLayoutKitId(Inventory top) {
-        ItemStack info = top.getItem(45);
-        if (info == null || !info.hasItemMeta()) return null;
+    private boolean isEditLayoutButton(String name) {
+        return name.contains("§aSave Layout")
+                || name.contains("§cReset to Default")
+                || name.contains("§cClose");
+    }
 
-        PersistentDataContainer pdc = info.getItemMeta().getPersistentDataContainer();
+    private String getEditLayoutKitId(ItemMeta meta) {
+        if (meta == null) return null;
+        PersistentDataContainer pdc = meta.getPersistentDataContainer();
         String kitId = pdc.get(editKitKey, PersistentDataType.STRING);
         return (kitId == null || kitId.isEmpty()) ? null : kitId;
     }

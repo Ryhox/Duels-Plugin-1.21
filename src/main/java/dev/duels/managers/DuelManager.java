@@ -26,7 +26,6 @@ public class DuelManager {
     private final Map<UUID, Location> pendingRoundRespawn = new HashMap<>();
     private final Set<UUID> roundDead = new HashSet<>();
     private final Set<UUID> pendingLobbyRespawn = new HashSet<>();
-    private final Map<PairKey, AutoSelect> autoSelect = new HashMap<>();
     private final Map<UUID, Long> lastRequestMs = new HashMap<>();
     private static final long REQUEST_COOLDOWN_MS = 10_000;
 
@@ -42,8 +41,6 @@ public class DuelManager {
         Location worldSpawn = p.getWorld().getSpawnLocation();
         if (worldSpawn != null) p.teleport(worldSpawn);
     }
-
-    private static final long AUTOSELECT_TIMEOUT_MS = 20000;
 
     public DuelManager(DuelsPlugin plugin) {
         this.plugin = plugin;
@@ -532,7 +529,6 @@ public class DuelManager {
         pendingRoundRespawn.clear();
         pendingLobbyRespawn.clear();
         roundDead.clear();
-        autoSelect.clear();
         lastRequestMs.clear();
     }
 
@@ -828,52 +824,4 @@ public class DuelManager {
         return roundDead.contains(uuid);
     }
 
-    public void handleAutoSelect(Player picker, Player target, String kitName, int bestOf) {
-        // Auto-Select-Logik
-    }
-
-    private static class PairKey {
-        final UUID a, b;
-
-        PairKey(UUID x, UUID y) {
-            if (x.compareTo(y) <= 0) {
-                this.a = x;
-                this.b = y;
-            } else {
-                this.a = y;
-                this.b = x;
-            }
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (!(o instanceof PairKey)) return false;
-            PairKey k = (PairKey) o;
-            return a.equals(k.a) && b.equals(k.b);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(a, b);
-        }
-    }
-
-    private static class AutoSelect {
-        final UUID firstPicker;
-        final String kitName;
-        final int bestOf;
-        final long timestamp;
-
-        AutoSelect(UUID firstPicker, String kitName, int bestOf) {
-            this.firstPicker = firstPicker;
-            this.kitName = kitName;
-            this.bestOf = bestOf;
-            this.timestamp = System.currentTimeMillis();
-        }
-
-        boolean isExpired() {
-            return System.currentTimeMillis() - timestamp > AUTOSELECT_TIMEOUT_MS;
-        }
-    }
 }

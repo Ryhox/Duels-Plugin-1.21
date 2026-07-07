@@ -64,7 +64,6 @@ public class DuelSession {
     public void setTimeLeft(int timeLeft) { this.timeLeft = timeLeft; }
     public MatchMode getMatchMode() { return matchMode; }
     public int getMatchValue() { return matchValue; }
-    public int getBestOf() { return matchValue; }
     public int getWinsP1() { return winsP1; }
     public void setWinsP1(int winsP1) { this.winsP1 = winsP1; }
     public int getWinsP2() { return winsP2; }

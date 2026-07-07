@@ -53,7 +53,7 @@ public class HotbarLockListener implements Listener {
 
         // allow clicks in your custom GUIs (GUIListener will handle cancelling)
         if (title.equals(dev.duels.guis.GUIManager.QUEUE_GUI_TITLE)
-                || title.equals(dev.duels.guis.GUIManager.BESTOF_GUI_TITLE)
+                || title.equals(dev.duels.guis.GUIManager.MATCH_LENGTH_GUI_TITLE)
                 || title.equals(dev.duels.guis.GUIManager.EDIT_LAYOUTS_GUI_TITLE)
                 || title.startsWith(dev.duels.guis.GUIManager.EDIT_LAYOUT_GUI_TITLE_PREFIX)
                 || title.equals(dev.duels.guis.GUIManager.DUEL_GUI_TITLE)
@@ -75,7 +75,7 @@ public class HotbarLockListener implements Listener {
         String title = event.getView().getTitle();
 
         if (title.equals(dev.duels.guis.GUIManager.QUEUE_GUI_TITLE)
-                || title.equals(dev.duels.guis.GUIManager.BESTOF_GUI_TITLE)
+                || title.equals(dev.duels.guis.GUIManager.MATCH_LENGTH_GUI_TITLE)
                 || title.equals(dev.duels.guis.GUIManager.EDIT_LAYOUTS_GUI_TITLE)
                 || title.startsWith(dev.duels.guis.GUIManager.EDIT_LAYOUT_GUI_TITLE_PREFIX)
                 || title.equals(dev.duels.guis.GUIManager.DUEL_GUI_TITLE)
